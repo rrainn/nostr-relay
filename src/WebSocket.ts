@@ -13,7 +13,7 @@ import * as http from "http";
 import * as fs from "fs";
 import * as path from "path";
 
-const configuration: Configuration = JSON.parse(fs.readFileSync(path.join(__dirname, "../config.json"), "utf8"));
+const configuration: Configuration = JSON.parse(fs.readFileSync(path.join(__dirname, "../../config.json"), "utf8"));
 
 import packageJson from "../package.json";
 
@@ -38,24 +38,22 @@ import getEventKindType from "./utils/getEventKindType";
 		switch (providerType) {
 			case "inmemory": {
 				const { default: provider } = await import("./data_providers/inmemory");
-				await provider.setup();
 				return provider;
 			}
 			case "filesystem": {
 				const { default: provider } = await import("./data_providers/filesystem");
-				await provider.setup();
 				return provider;
 			}
 			case "sqlite": {
-				const { default: provider } = await import("./data_providers/sqlite");
-				await provider.setup();
+				const { default: provider } = await import("./data_providers/sqlite/index");
 				return provider;
 			}
 			default: {
 				throw new Error(`Invalid data provider: ${providerType}`);
 			}
 		}
-	})();
+	})() as DataProvider;
+	await dataProvider.setup();
 
 	app.get("/", (req, res, next) => {
 		if (req.get("Accept") === "application/nostr+json") {
@@ -151,6 +149,8 @@ import getEventKindType from "./utils/getEventKindType";
 							console.error(`Received message with unsupported event kind`, message);
 							break;
 					}
+
+					break;
 				}
 				case "REQ": {
 					const id = messageObject[1];

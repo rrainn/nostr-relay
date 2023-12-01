@@ -2,14 +2,14 @@
   "name": "nostr-relay",
   "version": "1.0.0",
   "description": "A simple nostr relay.",
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "scripts": {
     "prepare": "npm run build:clean && npm run build",
     "test": "jest",
     "build": "tsc",
     "build:watch": "npm run build -- --watch",
     "build:clean": "rimraf dist",
-    "start": "node dist/WebSocket.js"
+    "start": "node dist/src/WebSocket.js"
   },
   "author": "rrainn, Inc.",
   "license": "UNLICENSED",

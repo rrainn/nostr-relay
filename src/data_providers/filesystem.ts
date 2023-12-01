@@ -5,7 +5,7 @@ import { DataProvider } from "../types/DataProvider";
 import { Event } from "../types/Event";
 import isEventExpired from "../utils/isEventExpired";
 
-const dataDirectory = path.join(__dirname, "../../data");
+const dataDirectory = path.join(__dirname, "../../../data");
 
 const provider: DataProvider = {
 	"setup": async () => {
