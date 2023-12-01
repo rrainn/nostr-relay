@@ -1,0 +1,15 @@
+{
+	"name": "",
+	"description": "",
+	"pubkey": "",
+	"contact": "",
+	"icon": "",
+	"storage": {
+		"type": "inmemory"
+	},
+	"eventCreatedAtLimits": {
+		"lower": 86400,
+		"upper": 900
+	},
+	"allowedPublicKeys": []
+}
