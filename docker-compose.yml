@@ -1,0 +1,11 @@
+version: "3"
+services:
+  server:
+    image: node:20.10.0
+    volumes:
+      - .:/project
+    command: "node project/dist/src/WebSocket.js"
+    environment:
+      - NODE_ENV=production
+    ports:
+      - 80:8080
