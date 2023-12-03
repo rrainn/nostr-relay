@@ -13,7 +13,7 @@ export default async function (configuration: Configuration, ws: WebSocket, data
 		if (message.created_at < lowerLimit || message.created_at > upperLimit) {
 			ws.send(JSON.stringify(["OK", message.id, false, `invalid: the event created_at field is out of the acceptable range (-${durationToString(configuration.eventCreatedAtLimits.lower)}, +${durationToString(configuration.eventCreatedAtLimits.upper)}) for this relay`]));
 			console.log(`Received message with createdAt outside of limits`, message);
-			return
+			return;
 		}
 	}
 
