@@ -42,6 +42,10 @@ const provider: DataProvider = {
 			const eventPath = path.join(dataDirectory, "events", `${event.id}.json`);
 			await fs.promises.writeFile(eventPath, JSON.stringify(event, null, "\t"));
 		},
+		"exists": async (id: string): Promise<boolean> => {
+			const eventPath = path.join(dataDirectory, "events", `${id}.json`);
+			return fs.existsSync(eventPath);
+		},
 		"purgeExpired": async (): Promise<void> => {
 			const now = Date.now() / 1000;
 			const eventDirectory = path.join(dataDirectory, "events");

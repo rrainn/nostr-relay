@@ -8,6 +8,7 @@ export interface DataProvider {
 		"getAll": () => Promise<Event[]>;
 		"delete": (id: string) => Promise<void>;
 		"save": (event: Event) => Promise<void>;
+		"exists": (id: string) => Promise<boolean>;
 		"purgeExpired": () => Promise<void>;
 	}
 }

@@ -24,6 +24,9 @@ const provider: DataProvider = {
 		"save": async (event: Event): Promise<void> => {
 			events.push(event);
 		},
+		"exists": async (id: string): Promise<boolean> => {
+			return events.some((event) => event.id === id);
+		},
 		"purgeExpired": async (): Promise<void> => {
 			events = events.filter((event) => isEventExpired(event) === false);
 		}

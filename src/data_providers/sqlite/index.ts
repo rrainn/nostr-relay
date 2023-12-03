@@ -41,6 +41,11 @@ const provider: DataProvider = {
 		"save": async (event: Event): Promise<void> => {
 			await db.run("INSERT INTO Event (id, pubkey, created_at, kind, tags, content, sig) VALUES (?, ?, ?, ?, ?, ?, ?)", event.id, event.pubkey, event.created_at, event.kind, JSON.stringify(event.tags), event.content, event.sig);
 		},
+		"exists": async (id: string): Promise<boolean> => {
+			const count = await db.get("SELECT COUNT(*) AS count FROM Event WHERE id = ?", id);
+			// I'm unsure if this `parseInt` is necessary, but I'm doing it just in case.
+			return parseInt(count.count) > 0;
+		},
 		"purgeExpired": async (): Promise<void> => {
 			const events: Event[] = (await db.all("SELECT * FROM Event")).map((event) => convertFromSqlite(event));
 			const expiredEvents: Event[] = events.filter((event) => isEventExpired(event));

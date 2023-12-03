@@ -7,11 +7,17 @@ import { DataProvider } from "../../types/DataProvider";
 export default async function (configuration: Configuration, ws: WebSocket, dataProvider: DataProvider, message: Event, sendEventToSubscribers: ((event: Event) => void)): Promise<void> {
 	if (configuration.allowedPublicKeys && configuration.allowedPublicKeys.includes(message.pubkey)) {
 		if (verifyNostrSignature(message)) {
-			await dataProvider.events.save(message);
-			sendEventToSubscribers(message);
-			ws.send(JSON.stringify(["OK", message.id, true, ""]));
-			console.log(`Received message`, message);
-			return;
+			if (await dataProvider.events.exists(message.id)) {
+				ws.send(JSON.stringify(["OK", message.id, false, "duplicate: event with this id already exists"]));
+				console.warn(`Received message with duplicate id`, message);
+				return;
+			} else {
+				await dataProvider.events.save(message);
+				sendEventToSubscribers(message);
+				ws.send(JSON.stringify(["OK", message.id, true, ""]));
+				console.log(`Received message`, message);
+				return;
+			}
 		} else {
 			ws.send(JSON.stringify(["OK", message.id, false, "error: invalid signature"]));
 			console.log(`Received message with invalid signature`, message);
