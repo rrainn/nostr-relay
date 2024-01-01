@@ -64,6 +64,14 @@ export interface Configuration {
 	 * If this field is an empty array, no public keys are allowed to send events to this relay.
 	 */
 	"allowedPublicKeys"?: string[];
+	/**
+	 * If the relay should always store events that are marked as replaceable.
+	 *
+	 * If this is set to `true`, the relay will never delete replaceable events.
+	 *
+	 * If this is set to `false` or `undefined`, the relay will delete replaceable events once they are superseded by another event.
+	 */
+	"alwaysStoreReplaceableEvents"?: boolean;
 }
 
 export type StorageType = "inmemory" | "filesystem" | "sqlite";

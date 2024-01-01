@@ -3,6 +3,8 @@ import { Configuration } from "../../types/Configuration";
 import { WebSocket } from "ws";
 import { verifyNostrSignature } from "../../utils/verifySignature";
 import { DataProvider } from "../../types/DataProvider";
+import getEventKindType from "../../utils/getEventKindType";
+import { EventKindType } from "../../types/EventKind";
 
 export default async function (configuration: Configuration, ws: WebSocket, dataProvider: DataProvider, message: Event, sendEventToSubscribers: ((event: Event) => void)): Promise<void> {
 	if (configuration.allowedPublicKeys && configuration.allowedPublicKeys.includes(message.pubkey)) {
@@ -16,6 +18,16 @@ export default async function (configuration: Configuration, ws: WebSocket, data
 				sendEventToSubscribers(message);
 				ws.send(JSON.stringify(["OK", message.id, true, ""]));
 				console.log(`Received message`, message);
+
+				if (configuration.alwaysStoreReplaceableEvents !== true) {
+					if (getEventKindType(message.kind) === EventKindType.replaceable) {
+						const events = await dataProvider.events.getAll();
+						const eventsToDelete = events.filter((event: Event) => message.kind === event.kind && message.pubkey === event.pubkey);
+						for (const event of eventsToDelete) {
+							await dataProvider.events.delete(event.id);
+						}
+					}
+				}
 				return;
 			}
 		} else {
