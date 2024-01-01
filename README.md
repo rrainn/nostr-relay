@@ -18,6 +18,7 @@ npm start
 ## Implemented NIPs
 
 ✅ Fully Implemented
+
 ⚠️ Partially Implemented
 
 - ✅ [NIP-01](https://github.com/nostr-protocol/nips/blob/master/01.md): Basic protocol flow description
