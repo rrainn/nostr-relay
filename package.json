@@ -12,7 +12,7 @@
     "start": "node dist/src/WebSocket.js"
   },
   "author": "rrainn, Inc.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "homepage": "https://github.com/rrainn/nostr-relay",
   "keywords": [
     "nostr",
