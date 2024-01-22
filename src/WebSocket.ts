@@ -126,7 +126,14 @@ import getEventKindType from "./utils/getEventKindType";
 
 		ws.on("message", async (message: Buffer) => {
 			const messageString: string = message.toString();
-			const messageObject = JSON.parse(messageString);
+			let messageObject: any;
+
+			try {
+				messageObject = JSON.parse(messageString);
+			} catch (e) {
+				console.error(`Received message that is not valid JSON: *${messageString}*`);
+				return;
+			}
 
 			const type = messageObject[0];
 
