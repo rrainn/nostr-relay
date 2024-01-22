@@ -1,6 +1,6 @@
 {
   "name": "nostr-relay",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A simple nostr relay.",
   "main": "dist/src/index.js",
   "scripts": {
