@@ -5,7 +5,7 @@ import { Event } from "../types/Event";
  * Returns true if the event matches the filters.
  */
 export function filtersMatchEvent(filters: FiltersObject, event: Event): boolean {
-	if (Object.keys(filters).length === 0) {
+	if (!filters || Object.keys(filters).length === 0) {
 		return true;
 	}
 
