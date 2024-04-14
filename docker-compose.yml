@@ -1,6 +1,11 @@
 version: "3"
 services:
   server:
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"  # Limit log file size to 100MB
+        max-file: "10"     # Retain only 10 log files
     image: node:20.10.0
     volumes:
       - .:/project
