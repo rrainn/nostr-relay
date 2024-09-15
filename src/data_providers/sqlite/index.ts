@@ -25,14 +25,14 @@ const provider: DataProvider = {
 	},
 	"events": {
 		"get": async (id: string): Promise<Event | undefined> => {
-			const event: Event | undefined = convertFromSqlite(await db.get("SELECT * FROM Event WHERE id = ?", id));
+			const event: Event | undefined = convertFromSqlite(await db.get("SELECT (id, pubkey, created_at, kind, tags, content, sig) FROM Event WHERE id = ?", id));
 			if (event && isEventExpired(event) === false) {
 				return event;
 			}
 			return undefined;
 		},
 		"getAll": async (): Promise<Event[]> => {
-			const events: Event[] = (await db.all("SELECT * FROM Event")).map((event) => convertFromSqlite(event));
+			const events: Event[] = (await db.all("SELECT (id, pubkey, created_at, kind, tags, content, sig) FROM Event")).map((event) => convertFromSqlite(event));
 			return events.filter((event) => isEventExpired(event) === false);
 		},
 		"delete": async (id: string): Promise<void> => {
@@ -47,7 +47,7 @@ const provider: DataProvider = {
 			return parseInt(count.count) > 0;
 		},
 		"purgeExpired": async (): Promise<void> => {
-			const events: Event[] = (await db.all("SELECT * FROM Event")).map((event) => convertFromSqlite(event));
+			const events: Event[] = (await db.all("SELECT (id, pubkey, created_at, kind, tags, content, sig) FROM Event")).map((event) => convertFromSqlite(event));
 			const expiredEvents: Event[] = events.filter((event) => isEventExpired(event));
 			console.log(`Purging ${expiredEvents.length} expired events`);
 			await Promise.all(expiredEvents.map((event) => db.run("DELETE FROM Event WHERE id = ?", event.id)));
