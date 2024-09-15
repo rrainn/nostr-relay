@@ -1,4 +1,4 @@
-export interface FiltersObject {
+interface FiltersObjectMain {
 	"ids"?: string[];
 	"authors"?: string[];
 	"kinds"?: number[];
@@ -9,3 +9,7 @@ export interface FiltersObject {
 	 */
 	"limit"?: number;
 }
+
+export type FiltersObject = FiltersObjectMain & {
+	[key: `#${string}`]: string;
+};

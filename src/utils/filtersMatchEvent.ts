@@ -15,7 +15,12 @@ export function filtersMatchEvent(filters: FiltersObject, event: Event): boolean
 	const sinceFilterPass = !filters.since || filters.since <= event.created_at;
 	const untilFilterPass = !filters.until || filters.until >= event.created_at;
 
-	return Boolean(idFilterPass && authorFilterPass && kindFilterPass && sinceFilterPass && untilFilterPass);
+	const tagsMatch = Object.entries(filters).filter(([key]) => /^#[a-zA-Z]$/gmu.test(key)).every(([key, value]) => {
+		const tag = key.slice(1);
+		const eventTagsThatMatchKey = event.tags.filter((eventTag) => eventTag[0] === tag);
 
-	// @TODO: implement "#<single-letter (a-zA-Z)>"
+		return eventTagsThatMatchKey.some((eventTag) => eventTag[1] === value);
+	});
+
+	return Boolean(idFilterPass && authorFilterPass && kindFilterPass && sinceFilterPass && untilFilterPass && tagsMatch);
 }

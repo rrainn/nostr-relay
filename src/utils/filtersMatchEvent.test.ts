@@ -54,7 +54,90 @@ test.concurrent.each([
 			"content": "Random content"
 		},
 		true
-	]
+	],
+	[
+		{
+			"#p": "9887797d06372fa7aa79950328e0754277ee748efa2222204c713ac03f1a5a81"
+		},
+		{
+			"id": "c9c8eea07db297ab0bee9e60bf1cb40ba13f93eba4ac50797e3aa5e3afe4c80f",
+			"pubkey": "54277ee748efa2222204c713ac03f1a5a819887797d06372fa7aa79950328e07",
+			"created_at": 1703779327,
+			"kind": 1,
+			"tags": [
+				["p", "9887797d06372fa7aa79950328e0754277ee748efa2222204c713ac03f1a5a81"]
+			],
+			"content": "Random content"
+		},
+		true
+	],
+	[
+		{
+			"#p": "277ee748efa2222204c713ac03f1a5a819887797d06372fa7aa79950328e0754"
+		},
+		{
+			"id": "c9c8eea07db297ab0bee9e60bf1cb40ba13f93eba4ac50797e3aa5e3afe4c80f",
+			"pubkey": "54277ee748efa2222204c713ac03f1a5a819887797d06372fa7aa79950328e07",
+			"created_at": 1703779327,
+			"kind": 1,
+			"tags": [
+				["p", "9887797d06372fa7aa79950328e0754277ee748efa2222204c713ac03f1a5a81"]
+			],
+			"content": "Random content"
+		},
+		false
+	],
+	[
+		{
+			"#t": "hello"
+		},
+		{
+			"id": "c9c8eea07db297ab0bee9e60bf1cb40ba13f93eba4ac50797e3aa5e3afe4c80f",
+			"pubkey": "54277ee748efa2222204c713ac03f1a5a819887797d06372fa7aa79950328e07",
+			"created_at": 1703779327,
+			"kind": 1,
+			"tags": [
+				["t", "hello"],
+				["t", "linux"]
+			],
+			"content": "#Hello world. This is a test running on #Linux."
+		},
+		true
+	],
+	[
+		{
+			"#t": "world"
+		},
+		{
+			"id": "c9c8eea07db297ab0bee9e60bf1cb40ba13f93eba4ac50797e3aa5e3afe4c80f",
+			"pubkey": "54277ee748efa2222204c713ac03f1a5a819887797d06372fa7aa79950328e07",
+			"created_at": 1703779327,
+			"kind": 1,
+			"tags": [
+				["t", "hello"],
+				["t", "linux"]
+			],
+			"content": "#Hello world. This is a test running on #Linux."
+		},
+		false
+	],
+	[
+		{
+			"#t": "linux"
+		},
+		{
+			"id": "c9c8eea07db297ab0bee9e60bf1cb40ba13f93eba4ac50797e3aa5e3afe4c80f",
+			"pubkey": "54277ee748efa2222204c713ac03f1a5a819887797d06372fa7aa79950328e07",
+			"created_at": 1703779327,
+			"kind": 1,
+			"tags": [
+				["t", "hello"],
+				["t", "linux"]
+			],
+			"content": "#Hello world. This is a test running on #Linux."
+		},
+		true
+	],
 ])(`filtersMatchEvent()`, async (filters, event, expected) => {
 	expect(filtersMatchEvent(filters as any, event as any)).toBe(expected);
 });
