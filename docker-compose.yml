@@ -10,6 +10,7 @@ services:
     volumes:
       - .:/project
     command: "node project/dist/src/WebSocket.js"
+    restart: unless-stopped
     environment:
       - NODE_ENV=production
     ports:
