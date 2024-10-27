@@ -240,5 +240,10 @@ import getEventKindType from "./utils/getEventKindType";
 		isRunningPurgeExpiredEvents = false;
 	}, 60000);
 
+	setInterval(async () => {
+		// Every 15 seconds print the number of connected clients.
+		console.log(`Number of connected clients: ${Object.keys(clients).length}`);
+	}, 15000);
+
 	server.listen(8080, () => console.log("Server is running on port 8080"));
 })();
