@@ -9,7 +9,7 @@ import insertEvent from "./insert";
 export default async function (configuration: Configuration, ws: WebSocket, dataProvider: DataProvider, message: Event, sendEventToSubscribers: ((event: Event) => void)): Promise<void> {
 	if (configuration.allowedPublicKeys && configuration.allowedPublicKeys.includes(message.pubkey)) {
 		if (verifyNostrSignature(message)) {
-			const usersEvents: Event[] = (await dataProvider.events.getAll()).filter((event) => event.pubkey === message.pubkey);
+			const usersEvents: Event[] = (await dataProvider.events.getAll({ authors: [message.pubkey] })).filter((event) => event.pubkey === message.pubkey);
 
 			const invalidDeleteIDs = message.tags.some((tag) => tag[0] !== "e" || usersEvents.some((event) => event.id === tag[1] && event.kind !== EventKind.TEXT));
 			if (invalidDeleteIDs) {

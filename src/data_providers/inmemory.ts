@@ -1,5 +1,6 @@
 import { DataProvider } from "../types/DataProvider";
 import { Event } from "../types/Event";
+import { FiltersObject } from "../types/FiltersObject";
 import isEventExpired from "../utils/isEventExpired";
 
 let events: Event[] = [];
@@ -15,7 +16,7 @@ const provider: DataProvider = {
 			}
 			return undefined;
 		},
-		"getAll": async (): Promise<Event[]> => {
+		"getAll": async (_filters?: FiltersObject): Promise<Event[]> => {
 			return events.filter((event) => isEventExpired(event) === false);
 		},
 		"delete": async (id: string): Promise<void> => {

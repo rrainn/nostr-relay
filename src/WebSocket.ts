@@ -170,7 +170,7 @@ import getEventKindType from "./utils/getEventKindType";
 					});
 
 					// Get all events matching the requested filters
-					const matchedEvents = (await dataProvider.events.getAll()).filter((event: Event) => filtersMatchEvent(filters, event));
+					const matchedEvents = (await dataProvider.events.getAll(filters)).filter((event: Event) => filtersMatchEvent(filters, event));
 					// First pass: find the latest event for each replaceable key
 					const latestReplaceableByKey = new Map<string, Event>();
 					const latestParameterizedByKey = new Map<string, Event>();

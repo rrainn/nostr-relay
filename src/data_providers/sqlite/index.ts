@@ -4,6 +4,8 @@ import { Database, Statement } from "sqlite3";
 
 import { DataProvider } from "../../types/DataProvider";
 import { Event } from "../../types/Event";
+import { FiltersObject } from "../../types/FiltersObject";
+import { filtersMatchEvent } from "../../utils/filtersMatchEvent";
 import isEventExpired from "../../utils/isEventExpired";
 
 let db: sqlite.Database<Database, Statement>;
@@ -31,9 +33,47 @@ const provider: DataProvider = {
 			}
 			return undefined;
 		},
-		"getAll": async (): Promise<Event[]> => {
-			const events: Event[] = (await db.all("SELECT * FROM Event")).map((event) => convertFromSqlite(event));
-			return events.filter((event) => isEventExpired(event) === false);
+		"getAll": async (filters?: FiltersObject): Promise<Event[]> => {
+			const whereClauses: string[] = [];
+			const params: any[] = [];
+
+			if (filters) {
+				if (filters.ids && filters.ids.length > 0) {
+					whereClauses.push(`id IN (${filters.ids.map(() => "?").join(", ")})`);
+					params.push(...filters.ids);
+				}
+				if (filters.authors && filters.authors.length > 0) {
+					whereClauses.push(`pubkey IN (${filters.authors.map(() => "?").join(", ")})`);
+					params.push(...filters.authors);
+				}
+				if (filters.kinds && filters.kinds.length > 0) {
+					whereClauses.push(`kind IN (${filters.kinds.map(() => "?").join(", ")})`);
+					params.push(...filters.kinds);
+				}
+				if (filters.since !== undefined) {
+					whereClauses.push(`created_at >= ?`);
+					params.push(filters.since);
+				}
+				if (filters.until !== undefined) {
+					whereClauses.push(`created_at <= ?`);
+					params.push(filters.until);
+				}
+			}
+
+			let sql = "SELECT * FROM Event";
+			if (whereClauses.length > 0) {
+				sql += " WHERE " + whereClauses.join(" AND ");
+			}
+
+			let events: Event[] = (await db.all(sql, ...params)).map((event) => convertFromSqlite(event));
+			events = events.filter((event) => isEventExpired(event) === false);
+
+			// Apply tag filters in-memory (tags are stored as JSON)
+			if (filters) {
+				events = events.filter((event) => filtersMatchEvent(filters, event));
+			}
+
+			return events;
 		},
 		"delete": async (id: string): Promise<void> => {
 			await db.run("DELETE FROM Event WHERE id = ?", id);

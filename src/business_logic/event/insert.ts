@@ -21,8 +21,7 @@ export default async function (configuration: Configuration, ws: WebSocket, data
 
 				if (configuration.alwaysStoreReplaceableEvents !== true) {
 					if (getEventKindType(message.kind) === EventKindType.replaceable) {
-						const events = await dataProvider.events.getAll();
-						const eventsToDelete = events.filter((event: Event) => message.kind === event.kind && message.pubkey === event.pubkey);
+						const eventsToDelete = (await dataProvider.events.getAll({ kinds: [message.kind], authors: [message.pubkey] })).filter((event: Event) => message.kind === event.kind && message.pubkey === event.pubkey);
 						for (const event of eventsToDelete) {
 							await dataProvider.events.delete(event.id);
 						}

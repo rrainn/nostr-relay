@@ -3,6 +3,7 @@ import * as fs from "fs";
 
 import { DataProvider } from "../types/DataProvider";
 import { Event } from "../types/Event";
+import { FiltersObject } from "../types/FiltersObject";
 import isEventExpired from "../utils/isEventExpired";
 
 const dataDirectory = path.join(__dirname, "../../../data");
@@ -23,7 +24,7 @@ const provider: DataProvider = {
 			}
 			return undefined;
 		},
-		"getAll": async (): Promise<Event[]> => {
+		"getAll": async (_filters?: FiltersObject): Promise<Event[]> => {
 			const events: Event[] = [];
 			const eventDirectory = path.join(dataDirectory, "events");
 			const eventFiles = await fs.promises.readdir(eventDirectory);
