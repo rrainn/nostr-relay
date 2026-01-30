@@ -169,20 +169,43 @@ import getEventKindType from "./utils/getEventKindType";
 						"filters": filters
 					});
 
+					// Get all events matching the requested filters
 					const matchedEvents = (await dataProvider.events.getAll()).filter((event: Event) => filtersMatchEvent(filters, event));
-					const filteredReplaceableEvents = matchedEvents.filter((event: Event, _i: number, array: Event[]) => {
+					// First pass: find the latest event for each replaceable key
+					const latestReplaceableByKey = new Map<string, Event>();
+					const latestParameterizedByKey = new Map<string, Event>();
+					matchedEvents.forEach((event: Event) => {
 						const kindType = getEventKindType(event.kind);
+
 						if (kindType === EventKindType.replaceable) {
-							const isLatest = array.filter((e: Event) => e.pubkey === event.pubkey && e.kind === event.kind).sort((a: Event, b: Event) => b.created_at - a.created_at)[0].id === event.id;
-							return isLatest;
+							const key = `${event.pubkey}:${event.kind}`;
+							const existing = latestReplaceableByKey.get(key);
+							if (!existing || event.created_at > existing.created_at) {
+								latestReplaceableByKey.set(key, event);
+							}
 						} else if (kindType === EventKindType.parameterized_replaceable) {
-							const isLatest = array.filter((e: Event) => {
-								return e.pubkey === event.pubkey && e.kind === event.kind && e.tags.find((t) => t[0] === "d")?.[1] === event.tags.find((t) => t[0] === "d")?.[1];
-							}).sort((a: Event, b: Event) => b.created_at - a.created_at)[0].id === event.id;
-							return isLatest;
+							const dTag = event.tags.find((t) => t[0] === "d")?.[1];
+							const key = `${event.pubkey}:${event.kind}:${dTag}`;
+							const existing = latestParameterizedByKey.get(key);
+							if (!existing || event.created_at > existing.created_at) {
+								latestParameterizedByKey.set(key, event);
+							}
+						}
+					});
+					// Second pass: filter keeping original order
+					const filteredReplaceableEvents = matchedEvents.filter((event: Event) => {
+						const kindType = getEventKindType(event.kind);
+
+						if (kindType === EventKindType.replaceable) {
+							const key = `${event.pubkey}:${event.kind}`;
+							return latestReplaceableByKey.get(key) === event;
+						} else if (kindType === EventKindType.parameterized_replaceable) {
+							const dTag = event.tags.find((t) => t[0] === "d")?.[1];
+							const key = `${event.pubkey}:${event.kind}:${dTag}`;
+							return latestParameterizedByKey.get(key) === event;
 						}
 
-						return true;
+						return true; // standard events always included
 					});
 
 					for (let i = 0; i < Math.min(filteredReplaceableEvents.length, filters.limit ?? filteredReplaceableEvents.length); i++) {
