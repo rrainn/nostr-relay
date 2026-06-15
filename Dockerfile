@@ -21,12 +21,18 @@ WORKDIR /project
 
 # Install only runtime packages; sqlite3 needs its native install step.
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends python3 make g++ \
+	&& npm ci --omit=dev --ignore-scripts \
+	&& npm rebuild sqlite3 --build-from-source \
+	&& apt-get purge -y --auto-remove make g++ \
+	&& rm -rf /var/lib/apt/lists/* \
+	&& npm cache clean --force
 
 COPY --from=build /project/dist ./dist
 COPY --from=build /project/resources ./resources
 
 # Compose mounts config.json and data.db for the production instance.
-RUN mkdir -p data
+RUN mkdir -p data && touch config.json data.db
 
 CMD ["node", "dist/src/WebSocket.js"]
