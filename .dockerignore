@@ -1,0 +1,10 @@
+# Exclude local state and development output from production images.
+.git
+.github
+node_modules
+dist
+coverage
+data
+data.db
+config.json
+npm-debug.log*
