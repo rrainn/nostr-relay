@@ -1,3 +1,5 @@
+type TagFilterValue = string | string[];
+
 interface FiltersObjectMain {
 	"ids"?: string[];
 	"authors"?: string[];
@@ -11,5 +13,5 @@ interface FiltersObjectMain {
 }
 
 export type FiltersObject = FiltersObjectMain & {
-	[key: `#${string}`]: string;
+	[key: `#${string}`]: TagFilterValue | undefined;
 };
