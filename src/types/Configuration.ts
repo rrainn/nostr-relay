@@ -72,6 +72,39 @@ export interface Configuration {
 	 * If this is set to `false` or `undefined`, the relay will delete replaceable events once they are superseded by another event.
 	 */
 	"alwaysStoreReplaceableEvents"?: boolean;
+	/**
+	 * Resource limits that keep broad subscriptions and idle clients bounded.
+	 */
+	"resourceLimits"?: {
+		/**
+		 * The event limit used when a subscription omits `limit` or sends an invalid value.
+		 */
+		"defaultSubscriptionLimit"?: number;
+		/**
+		 * The largest event limit any subscription may request.
+		 */
+		"maxSubscriptionLimit"?: number;
+		/**
+		 * The maximum active subscriptions allowed for one WebSocket connection.
+		 */
+		"maxSubscriptionsPerConnection"?: number;
+		/**
+		 * The maximum concurrent WebSocket connections allowed from one IP address.
+		 */
+		"maxConnectionsPerIp"?: number;
+		/**
+		 * The largest WebSocket message payload accepted by the relay, in bytes.
+		 */
+		"maxMessageBytes"?: number;
+		/**
+		 * The number of seconds a connection may be idle before it is closed.
+		 */
+		"idleTimeoutSeconds"?: number;
+		/**
+		 * The number of seconds between WebSocket ping checks.
+		 */
+		"pingIntervalSeconds"?: number;
+	};
 }
 
 export type StorageType = "inmemory" | "filesystem" | "sqlite";

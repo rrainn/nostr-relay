@@ -11,5 +11,14 @@
 		"lower": 86400,
 		"upper": 900
 	},
+	"resourceLimits": {
+		"defaultSubscriptionLimit": 500,
+		"maxSubscriptionLimit": 1000,
+		"maxSubscriptionsPerConnection": 32,
+		"maxConnectionsPerIp": 64,
+		"maxMessageBytes": 65536,
+		"idleTimeoutSeconds": 120,
+		"pingIntervalSeconds": 30
+	},
 	"allowedPublicKeys": []
 }

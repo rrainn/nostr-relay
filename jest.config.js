@@ -3,6 +3,7 @@ module.exports = {
 	"testEnvironment": "node",
 	"testMatch": ["**/src/**/*.test.[jt]s?(x)"],
 	"testPathIgnorePatterns": ["/node_modules/", "/dist/"],
+	"modulePathIgnorePatterns": ["/dist/"],
 	"coverageReporters": ["json", "lcov", "text", "html"],
 	"transformIgnorePatterns": ["dist/.+\\.js"]
 };

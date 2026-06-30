@@ -3,10 +3,11 @@ import WebSocket from "ws";
 import { FiltersObject } from "./types/FiltersObject";
 import { Subscription } from "./types/Subscription";
 import { Event } from "./types/Event";
-import { EventKind, EventKindType } from "./types/EventKind";
+import { EventKind } from "./types/EventKind";
 import { filtersMatchEvent } from "./utils/filtersMatchEvent";
 import { DataProvider } from "./types/DataProvider";
 import { Configuration, StorageType } from "./types/Configuration";
+import { normalizeSubscriptionLimit, resolveResourceLimits } from "./utils/resourceLimits";
 
 import express from "express";
 import * as http from "http";
@@ -20,18 +21,29 @@ import packageJson from "../package.json";
 import EventTextHandler from "./business_logic/event/text";
 import EventDeletionHandler from "./business_logic/event/deletion";
 import EventInsertHandler from "./business_logic/event/insert";
-import getEventKindType from "./utils/getEventKindType";
+
+type ClientId = `${string}-${string}-${string}-${string}-${string}`;
+
+interface ClientState {
+	"ws": WebSocket;
+	"ip": string;
+	"isAlive": boolean;
+	"lastActivityAt": number;
+}
 
 (async () => {
 	const app = express();
 	const server = http.createServer(app);
+	const resourceLimits = resolveResourceLimits(configuration);
 
 	const wss = new WebSocket.Server({
-		server
+		"server": server,
+		"maxPayload": resourceLimits.maxMessageBytes
 	});
 
-	let clients: {[key: `${string}-${string}-${string}-${string}-${string}`]: any} = {};
-	let subscriptions: {[key: `${string}-${string}-${string}-${string}-${string}`]: Subscription[]} = {};
+	let clients: {[key: string]: ClientState} = {};
+	let subscriptions: {[key: string]: Subscription[]} = {};
+	let connectionCountsByIp: {[key: string]: number} = {};
 
 	const dataProvider: DataProvider = await (async () => {
 		const providerType: StorageType = configuration.storage.type;
@@ -101,6 +113,12 @@ import getEventKindType from "./utils/getEventKindType";
 				}
 				response.limitation["restricted_writes"] = true;
 			}
+			if (!response.limitation) {
+				response.limitation = {};
+			}
+			response.limitation["max_limit"] = resourceLimits.maxSubscriptionLimit;
+			response.limitation["max_message_length"] = resourceLimits.maxMessageBytes;
+			response.limitation["max_subscriptions"] = resourceLimits.maxSubscriptionsPerConnection;
 			res.json(response);
 		} else {
 			next();
@@ -112,26 +130,106 @@ import getEventKindType from "./utils/getEventKindType";
 			subscriptions.forEach((subscription: Subscription) => {
 				const filters = subscription.filters;
 				if (filtersMatchEvent(filters, event)) {
-					clients[uuid as `${string}-${string}-${string}-${string}-${string}`].send(JSON.stringify(["EVENT", subscription.id, event]));
+					const client = clients[uuid];
+					if (client && client.ws.readyState === WebSocket.OPEN) {
+						client.ws.send(JSON.stringify(["EVENT", subscription.id, event]));
+					}
 				}
 			});
 		});
 	}
 
-	wss.on("connection", (ws) => {
-		const uuid = randomUUID();
-		console.log(`Client connected: ${uuid}`);
+	/**
+	 * Sends a Nostr NOTICE if the connection can still receive messages.
+	 */
+	function sendNotice(ws: WebSocket, message: string): void {
+		if (ws.readyState === WebSocket.OPEN) {
+			ws.send(JSON.stringify(["NOTICE", message]));
+		}
+	}
 
-		clients[uuid] = ws;
+	/**
+	 * Releases all per-client resources and decrements the IP connection count.
+	 */
+	function cleanupClient(uuid: ClientId): void {
+		const client = clients[uuid];
+		if (!client) {
+			return;
+		}
+
+		connectionCountsByIp[client.ip] = Math.max((connectionCountsByIp[client.ip] ?? 1) - 1, 0);
+		if (connectionCountsByIp[client.ip] === 0) {
+			delete connectionCountsByIp[client.ip];
+		}
+
+		delete clients[uuid];
+		delete subscriptions[uuid];
+	}
+
+	/**
+	 * Extracts the best available remote IP for coarse connection limiting.
+	 */
+	function getConnectionIp(request: http.IncomingMessage): string {
+		const forwardedFor = request.headers["x-forwarded-for"];
+		if (typeof forwardedFor === "string" && forwardedFor.length > 0) {
+			return forwardedFor.split(",")[0].trim();
+		}
+
+		return request.socket.remoteAddress ?? "unknown";
+	}
+
+	wss.on("connection", (ws, request) => {
+		const ip = getConnectionIp(request);
+		if ((connectionCountsByIp[ip] ?? 0) >= resourceLimits.maxConnectionsPerIp) {
+			sendNotice(ws, "too many connections from this IP");
+			ws.close(1008, "too many connections");
+			console.warn("Rejected client connection", {
+				"ip": ip,
+				"maxConnectionsPerIp": resourceLimits.maxConnectionsPerIp
+			});
+			return;
+		}
+
+		const uuid = randomUUID() as ClientId;
+		connectionCountsByIp[ip] = (connectionCountsByIp[ip] ?? 0) + 1;
+		clients[uuid] = {
+			"ws": ws,
+			"ip": ip,
+			"isAlive": true,
+			"lastActivityAt": Date.now()
+		};
+		subscriptions[uuid] = [];
+		console.log("Client connected", {
+			"uuid": uuid,
+			"ip": ip,
+			"connectionCountForIp": connectionCountsByIp[ip]
+		});
 
 		ws.on("message", async (message: Buffer) => {
+			const client = clients[uuid];
+			if (!client) {
+				return;
+			}
+			client.lastActivityAt = Date.now();
+
+			if (message.length > resourceLimits.maxMessageBytes) {
+				sendNotice(ws, `message too large; max size is ${resourceLimits.maxMessageBytes} bytes`);
+				ws.close(1009, "message too large");
+				return;
+			}
+
 			const messageString: string = message.toString();
 			let messageObject: any;
 
 			try {
 				messageObject = JSON.parse(messageString);
 			} catch (e) {
-				console.error(`Received message that is not valid JSON: *${messageString}*`);
+				sendNotice(ws, "invalid: message is not valid JSON");
+				console.error("Received message that is not valid JSON", {
+					"uuid": uuid,
+					"ip": ip,
+					"byteLength": message.length
+				});
 				return;
 			}
 
@@ -153,7 +251,11 @@ import getEventKindType from "./utils/getEventKindType";
 							break;
 						default:
 							ws.send(JSON.stringify(["OK", message.id, false, "invalid: unsupported event kind"]));
-							console.error(`Received message with unsupported event kind`, message);
+							console.error("Received message with unsupported event kind", {
+								"id": message.id,
+								"kind": message.kind,
+								"pubkey": message.pubkey
+							});
 							break;
 					}
 
@@ -161,64 +263,80 @@ import getEventKindType from "./utils/getEventKindType";
 				}
 				case "REQ": {
 					const id = messageObject[1];
-					const filters: FiltersObject = messageObject[2];
-
-					subscriptions[uuid] = subscriptions[uuid] || [];
-					subscriptions[uuid].push({
-						"id": id,
-						"filters": filters
-					});
-
-					// Get all events matching the requested filters
-					const matchedEvents = (await dataProvider.events.getAll(filters)).filter((event: Event) => filtersMatchEvent(filters, event));
-					// First pass: find the latest event for each replaceable key
-					const latestReplaceableByKey = new Map<string, Event>();
-					const latestParameterizedByKey = new Map<string, Event>();
-					matchedEvents.forEach((event: Event) => {
-						const kindType = getEventKindType(event.kind);
-
-						if (kindType === EventKindType.replaceable) {
-							const key = `${event.pubkey}:${event.kind}`;
-							const existing = latestReplaceableByKey.get(key);
-							if (!existing || event.created_at > existing.created_at) {
-								latestReplaceableByKey.set(key, event);
-							}
-						} else if (kindType === EventKindType.parameterized_replaceable) {
-							const dTag = event.tags.find((t) => t[0] === "d")?.[1];
-							const key = `${event.pubkey}:${event.kind}:${dTag}`;
-							const existing = latestParameterizedByKey.get(key);
-							if (!existing || event.created_at > existing.created_at) {
-								latestParameterizedByKey.set(key, event);
-							}
-						}
-					});
-					// Second pass: filter keeping original order
-					const filteredReplaceableEvents = matchedEvents.filter((event: Event) => {
-						const kindType = getEventKindType(event.kind);
-
-						if (kindType === EventKindType.replaceable) {
-							const key = `${event.pubkey}:${event.kind}`;
-							return latestReplaceableByKey.get(key) === event;
-						} else if (kindType === EventKindType.parameterized_replaceable) {
-							const dTag = event.tags.find((t) => t[0] === "d")?.[1];
-							const key = `${event.pubkey}:${event.kind}:${dTag}`;
-							return latestParameterizedByKey.get(key) === event;
-						}
-
-						return true; // standard events always included
-					});
-
-					for (let i = 0; i < Math.min(filteredReplaceableEvents.length, filters.limit ?? filteredReplaceableEvents.length); i++) {
-						const event = filteredReplaceableEvents[i];
-						console.log(`Sending event to client: ${id}`, event);
-						ws.send(JSON.stringify(["EVENT", id, event]));
+					const rawFilters = messageObject[2] ?? {};
+					if (typeof id !== "string" || rawFilters === null || typeof rawFilters !== "object" || Array.isArray(rawFilters)) {
+						sendNotice(ws, "invalid: REQ must include a subscription id and filter object");
+						break;
 					}
 
-					// EOSE should be sent once all initial events have been sent (either by limit being reached, or no more events matching the filters)
-					// https://github.com/nostr-protocol/nips/discussions/906#discussioncomment-7719394
-					ws.send(JSON.stringify(["EOSE", id]));
+					const normalizedLimit = normalizeSubscriptionLimit(rawFilters.limit, resourceLimits);
+					const filters: FiltersObject = {
+						...rawFilters,
+						"limit": normalizedLimit.limit
+					};
+					if (normalizedLimit.notice) {
+						sendNotice(ws, `${normalizedLimit.notice} for subscription ${id}`);
+					}
 
-					console.log(`Received subscription request: ${id}`, filters);
+					const activeSubscriptions = subscriptions[uuid] ?? [];
+					const existingSubscriptionIndex = activeSubscriptions.findIndex((subscription) => subscription.id === id);
+					if (existingSubscriptionIndex === -1 && activeSubscriptions.length >= resourceLimits.maxSubscriptionsPerConnection) {
+						sendNotice(ws, `too many subscriptions; max is ${resourceLimits.maxSubscriptionsPerConnection}`);
+						console.warn("Rejected subscription request", {
+							"uuid": uuid,
+							"ip": ip,
+							"subscriptionId": id,
+							"activeSubscriptions": activeSubscriptions.length
+						});
+						break;
+					}
+
+					if (existingSubscriptionIndex === -1) {
+						activeSubscriptions.push({
+							"id": id,
+							"filters": filters
+						});
+					} else {
+						activeSubscriptions[existingSubscriptionIndex] = {
+							"id": id,
+							"filters": filters
+						};
+					}
+					subscriptions[uuid] = activeSubscriptions;
+
+					const startedAt = Date.now();
+					let eventCount = 0;
+					try {
+						eventCount = await dataProvider.events.query(filters, { "limit": filters.limit ?? resourceLimits.defaultSubscriptionLimit }, (event: Event) => {
+							if (ws.readyState === WebSocket.OPEN) {
+								ws.send(JSON.stringify(["EVENT", id, event]));
+							}
+						});
+
+						// EOSE is sent once all initial bounded events have been sent.
+						if (ws.readyState === WebSocket.OPEN) {
+							ws.send(JSON.stringify(["EOSE", id]));
+						}
+					} catch (error) {
+						sendNotice(ws, "error: failed to process subscription");
+						console.error("Failed to process subscription request", {
+							"uuid": uuid,
+							"ip": ip,
+							"subscriptionId": id,
+							"error": error
+						});
+						break;
+					}
+
+					console.log("Processed subscription request", {
+						"uuid": uuid,
+						"ip": ip,
+						"subscriptionId": id,
+						"limit": filters.limit,
+						"filterKeys": Object.keys(filters).filter((key) => key !== "limit"),
+						"eventCount": eventCount,
+						"durationMs": Date.now() - startedAt
+					});
 					break;
 				}
 				case "CLOSE": {
@@ -230,21 +348,85 @@ import getEventKindType from "./utils/getEventKindType";
 
 					subscriptions[uuid] = subscriptions[uuid].filter((subscription: Subscription) => subscription.id !== id);
 
-					console.log(`Received subscription close: ${id}`);
+					console.log("Received subscription close", {
+						"uuid": uuid,
+						"ip": ip,
+						"subscriptionId": id
+					});
 					break;
 				}
 				default:
-					console.log(`Unimplemented type: ${type}`);
+					sendNotice(ws, `unsupported message type: ${type}`);
+					console.log("Unimplemented message type", {
+						"uuid": uuid,
+						"ip": ip,
+						"type": type
+					});
 					break;
 			}
 		});
 
 		ws.on("close", () => {
-			delete clients[uuid];
-			delete subscriptions[uuid];
-			console.log(`Client disconnected: ${uuid}`);
+			cleanupClient(uuid);
+			console.log("Client disconnected", {
+				"uuid": uuid,
+				"ip": ip
+			});
+		});
+
+		ws.on("error", (error) => {
+			cleanupClient(uuid);
+			console.error("Client WebSocket error", {
+				"uuid": uuid,
+				"ip": ip,
+				"error": error
+			});
+		});
+
+		ws.on("pong", () => {
+			const client = clients[uuid];
+			if (client) {
+				client.isAlive = true;
+				client.lastActivityAt = Date.now();
+			}
 		});
 	});
+
+	setInterval(() => {
+		const now = Date.now();
+		Object.entries(clients).forEach(([uuid, client]) => {
+			if (client.ws.readyState !== WebSocket.OPEN) {
+				cleanupClient(uuid as ClientId);
+				return;
+			}
+
+			const idleTime = now - client.lastActivityAt;
+			if (idleTime > resourceLimits.idleTimeoutSeconds * 1000) {
+				sendNotice(client.ws, "idle timeout");
+				client.ws.close(1001, "idle timeout");
+				cleanupClient(uuid as ClientId);
+				console.log("Closed idle client", {
+					"uuid": uuid,
+					"ip": client.ip,
+					"idleMs": idleTime
+				});
+				return;
+			}
+
+			if (!client.isAlive) {
+				client.ws.terminate();
+				cleanupClient(uuid as ClientId);
+				console.log("Terminated unresponsive client", {
+					"uuid": uuid,
+					"ip": client.ip
+				});
+				return;
+			}
+
+			client.isAlive = false;
+			client.ws.ping();
+		});
+	}, resourceLimits.pingIntervalSeconds * 1000);
 
 	let isRunningPurgeExpiredEvents = false;
 	setInterval(async () => {
@@ -255,8 +437,10 @@ import getEventKindType from "./utils/getEventKindType";
 		isRunningPurgeExpiredEvents = true;
 		try {
 			console.log("Purging expired events");
-			await dataProvider.events.purgeExpired();
-			console.log("Successfully purged expired events");
+			const purgedEventCount = await dataProvider.events.purgeExpired();
+			console.log("Successfully purged expired events", {
+				"purgedEventCount": purgedEventCount
+			});
 		} catch (error) {
 			console.error(`Failed to purge expired events: `, error);
 		}
